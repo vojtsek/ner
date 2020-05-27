@@ -161,6 +161,7 @@ class NER:
         self._x_c = x_char
         self._y_true = y_true
         self._y_pred = predictions
+        self._y_logits = tf.nn.softmax(logits)
         if concat_embeddings:
             self._x_emb = x_emb
         if use_crf:
@@ -270,8 +271,8 @@ class NER:
                 viterbi_seq, viterbi_score = tf.contrib.crf.viterbi_decode(logit, trans_params)
                 y_pred += [viterbi_seq]
         else:
-            y_pred = self._sess.run(self._y_pred, feed_dict=feed_dict)
-        return self.corpus.tag_dict.batch_idxs2batch_toks(y_pred, filter_paddings=True)
+            y_pred, logits = self._sess.run([self._y_pred, self._y_logits], feed_dict=feed_dict)
+        return self.corpus.tag_dict.batch_idxs2batch_toks(y_pred, filter_paddings=True), logits
 
     def eval_conll(self, dataset_type='test', print_results=True, short_report=True):
         y_true_list = list()
@@ -378,11 +379,11 @@ class NER:
     def predict_for_token_batch(self, tokens_batch):
         batch_x, _ = self.corpus.tokens_batch_to_numpy_batch(tokens_batch)
         # Prediction indices
-        predictions_batch = self.predict(batch_x)
+        predictions_batch, logits = self.predict(batch_x)
         predictions_batch_no_pad = list()
         for n, predicted_tags in enumerate(predictions_batch):
             predictions_batch_no_pad.append(predicted_tags[: len(tokens_batch[n])])
-        return predictions_batch_no_pad
+        return predictions_batch_no_pad, logits
 
 
 if __name__ == '__main__':
